@@ -3,7 +3,6 @@ Param(
     [string]$operation
 )
 
-#$ResourceID = "/subscriptions/12345678-1234-1234-1234-123a12b12d1c/resourceGroups/fabric-rg/providers/Microsoft.Fabric/capacities/myf2capacity"
 #$operation = "suspend" 
 #$operation = "resume"
 
@@ -26,25 +25,24 @@ $headers = @{
     'Authorization' = "Bearer $token"
 }
 
-$response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
-
-foreach($o in $response){
-    $ResourceID = $o
-    $o | ForEach-Object -Process { 
-        $_
-        Write-Output $_.value.Count
-        Write-Output $_.value.GetType()
-        $_.value.id | ForEach-Object -Process {
-            $url = "https://management.azure.com/$_/$operation" + "?api-version=2023-11-01"
-            $headers = @{
-                'Content-Type' = 'application/json'
-                'Authorization' = "Bearer $token"
-            }
-            #Write-Output $url
-            $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers
-        
-            $response
-            }
+Invoke-RestMethod -Uri $url -Method Get -Headers $headers | ForEach-Object -Process{
+    $c = 0
+    $_.value| ForEach-Object -Process{
+        #Write-Output $_
+        Write-Output "count: $($c)"
+        Write-Output $_.properties.state
+        if ((("suspend" -eq $operation) -and ("Active" -eq $_.properties.state)) -or (("resume" -eq $operation) -and ("Paused" -eq $_.properties.state))) {
+          $url = "https://management.azure.com/$($_.id)/$operation" + "?api-version=2023-11-01"
+          $headers = @{
+              'Content-Type' = 'application/json'
+              'Authorization' = "Bearer $token"
+          }
+          Write-Output $url
+          $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers                 
+          #$response
+        }else{
+            Write-Output "not active : $($_.properties.state)"
         }
+        $c = $c + 1
+  }
 }
-
